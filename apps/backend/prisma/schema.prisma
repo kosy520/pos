@@ -1,0 +1,45 @@
+model Tenant {
+  id         Int      @id @default(autoincrement())
+  qrSecret   String?
+}
+
+model Device {
+  id         Int      @id @default(autoincrement())
+  name       String
+}
+
+model InvoiceDraft {
+  id         Int      @id @default(autoincrement())
+}
+
+model InvoiceDraftLine {
+  id         Int      @id @default(autoincrement())
+}
+
+model InvoiceComparison {
+  id         Int      @id @default(autoincrement())
+}
+
+model InvoiceFinal {
+  id         Int      @id @default(autoincrement())
+}
+
+model StockCountSession {
+  id         Int      @id @default(autoincrement())
+}
+
+model StockCountLine {
+  id         Int      @id @default(autoincrement())
+}
+
+model StockAdjustment {
+  id         Int      @id @default(autoincrement())
+}
+
+model JournalEntry {
+  id         Int      @id @default(autoincrement())
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+}
