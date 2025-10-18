@@ -18,7 +18,7 @@ import { StockCountsModule } from './modules/stock-counts/stock-counts.module';
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET || 'default-secret',
-      signOptions: { expiresIn: process.env.JWT_EXPIRATION || '24h' },
+      signOptions: { expiresIn: '24h' },
     }),
     PrismaModule,
     AuthModule,

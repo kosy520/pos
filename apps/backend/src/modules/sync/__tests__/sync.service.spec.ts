@@ -72,11 +72,11 @@ describe('SyncService - Idempotency', () => {
         status: 'success',
       } as any);
 
-    const invoiceDraftsService = module.get<InvoiceDraftsService>(InvoiceDraftsService);
+    const invoiceDraftsService = (service as any).invoiceDraftsService;
     jest.spyOn(invoiceDraftsService, 'create')
       .mockResolvedValue({ id: 'draft-789' } as any);
 
-    const devicesService = module.get<DevicesService>(DevicesService);
+    const devicesService = (service as any).devicesService;
     jest.spyOn(devicesService, 'updateLastSync')
       .mockResolvedValue({} as any);
 
@@ -115,7 +115,7 @@ describe('SyncService - Idempotency', () => {
     jest.spyOn(prismaService.syncOperation, 'findUnique')
       .mockResolvedValue(existingOp as any);
 
-    const devicesService = module.get<DevicesService>(DevicesService);
+    const devicesService = (service as any).devicesService;
     jest.spyOn(devicesService, 'updateLastSync')
       .mockResolvedValue({} as any);
 
@@ -147,7 +147,7 @@ describe('SyncService - Idempotency', () => {
     jest.spyOn(prismaService.syncOperation, 'findUnique')
       .mockResolvedValue(null);
 
-    const invoiceDraftsService = module.get<InvoiceDraftsService>(InvoiceDraftsService);
+    const invoiceDraftsService = (service as any).invoiceDraftsService;
     jest.spyOn(invoiceDraftsService, 'create')
       .mockRejectedValue(new Error('Database error'));
 
@@ -159,7 +159,7 @@ describe('SyncService - Idempotency', () => {
         errorMessage: 'Database error',
       } as any);
 
-    const devicesService = module.get<DevicesService>(DevicesService);
+    const devicesService = (service as any).devicesService;
     jest.spyOn(devicesService, 'updateLastSync')
       .mockResolvedValue({} as any);
 
@@ -192,7 +192,7 @@ describe('SyncService - Idempotency', () => {
       .mockResolvedValueOnce({ id: 'existing', opId: 'op-2', serverId: 'draft-2', status: 'success' } as any) // op-2: duplicate
       .mockResolvedValueOnce(null); // op-3: new
 
-    const invoiceDraftsService = module.get<InvoiceDraftsService>(InvoiceDraftsService);
+    const invoiceDraftsService = (service as any).invoiceDraftsService;
     jest.spyOn(invoiceDraftsService, 'create')
       .mockResolvedValueOnce({ id: 'draft-1' } as any) // op-1: success
       .mockRejectedValueOnce(new Error('Failed')); // op-3: fails
@@ -200,7 +200,7 @@ describe('SyncService - Idempotency', () => {
     jest.spyOn(prismaService.syncOperation, 'create')
       .mockResolvedValue({} as any);
 
-    const devicesService = module.get<DevicesService>(DevicesService);
+    const devicesService = (service as any).devicesService;
     jest.spyOn(devicesService, 'updateLastSync')
       .mockResolvedValue({} as any);
 

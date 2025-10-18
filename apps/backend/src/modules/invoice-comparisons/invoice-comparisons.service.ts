@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CompareInvoicesDto } from './dto/compare-invoices.dto';
 import { QRService } from '../../common/utils/qr.service';
 
-interface ComparisonResult {
+export interface ComparisonResult {
   matched: boolean;
   differences: Array<{
     field: string;
@@ -145,18 +145,18 @@ export class InvoiceComparisonsService {
           target: null,
         });
       } else {
-        if (sourceLine.quantity !== targetLine.quantity) {
+        if ((sourceLine as any).quantity !== (targetLine as any).quantity) {
           differences.push({
             field: `line[${sku}].quantity`,
-            source: sourceLine.quantity,
-            target: targetLine.quantity,
+            source: (sourceLine as any).quantity,
+            target: (targetLine as any).quantity,
           });
         }
-        if (sourceLine.unitPrice !== targetLine.unitPrice) {
+        if ((sourceLine as any).unitPrice !== (targetLine as any).unitPrice) {
           differences.push({
             field: `line[${sku}].unitPrice`,
-            source: sourceLine.unitPrice,
-            target: targetLine.unitPrice,
+            source: (sourceLine as any).unitPrice,
+            target: (targetLine as any).unitPrice,
           });
         }
       }
