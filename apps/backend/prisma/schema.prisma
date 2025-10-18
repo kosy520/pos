@@ -1,0 +1,248 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tenant model (existing in system as mentioned in requirements)
+model Tenant {
+  id                String              @id @default(uuid())
+  name              String
+  signingSecret     String              @map("signing_secret") // For QR code HMAC signing
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  
+  devices           Device[]
+  invoiceDrafts     InvoiceDraft[]
+  invoiceComparisons InvoiceComparison[]
+  invoiceFinals     InvoiceFinal[]
+  stockCountSessions StockCountSession[]
+  auditLogs         AuditLog[]
+
+  @@map("tenants")
+}
+
+// User model (existing in system for JWT auth)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  tenantId  String   @map("tenant_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// Device registration for offline devices
+model Device {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  deviceName      String   @map("device_name")
+  publicKey       String   @map("public_key") // Device's public key for verification
+  registeredAt    DateTime @default(now()) @map("registered_at")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  
+  invoiceDrafts   InvoiceDraft[]
+  stockCountSessions StockCountSession[]
+
+  @@map("devices")
+}
+
+// Product model (referenced by invoice and stock count lines)
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  barcode     String?  @unique
+  name        String
+  description String?
+  price       Float
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  invoiceDraftLines InvoiceDraftLine[]
+  stockCountLines   StockCountLine[]
+  stockAdjustments  StockAdjustment[]
+
+  @@map("products")
+}
+
+// Invoice Draft (provisional, created offline or online)
+model InvoiceDraft {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  deviceId        String?   @map("device_id") // null if created online
+  draftNumber     String    @map("draft_number")
+  status          String    @default("draft") // draft, provisional, processed
+  totalAmount     Float     @default(0) @map("total_amount")
+  qrPayload       String?   @map("qr_payload") // Signed QR data (device-signed or server-signed)
+  qrSignature     String?   @map("qr_signature")
+  signedBy        String?   @map("signed_by") // device_id or "server"
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  device          Device?   @relation(fields: [deviceId], references: [id])
+  
+  lines           InvoiceDraftLine[]
+  comparisonsAsSource InvoiceComparison[] @relation("SourceDraft")
+  comparisonsAsTarget InvoiceComparison[] @relation("TargetDraft")
+
+  @@unique([tenantId, draftNumber])
+  @@map("invoice_drafts")
+}
+
+// Invoice Draft Line Items
+model InvoiceDraftLine {
+  id              String        @id @default(uuid())
+  draftId         String        @map("draft_id")
+  productId       String        @map("product_id")
+  quantity        Float
+  unitPrice       Float         @map("unit_price")
+  lineTotal       Float         @map("line_total")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  
+  draft           InvoiceDraft  @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
+
+  @@map("invoice_draft_lines")
+}
+
+// Invoice Comparison (result of comparing two drafts or QR payloads)
+model InvoiceComparison {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  sourceDraftId     String?   @map("source_draft_id")
+  targetDraftId     String?   @map("target_draft_id")
+  sourceQrPayload   String?   @map("source_qr_payload") // If comparison from QR scan
+  targetQrPayload   String?   @map("target_qr_payload")
+  comparisonResult  String    @map("comparison_result") @db.Text // JSON with differences
+  status            String    @default("pending") // pending, reconciled, rejected
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  sourceDraft       InvoiceDraft? @relation("SourceDraft", fields: [sourceDraftId], references: [id])
+  targetDraft       InvoiceDraft? @relation("TargetDraft", fields: [targetDraftId], references: [id])
+  
+  finalInvoice      InvoiceFinal?
+
+  @@map("invoice_comparisons")
+}
+
+// Final Invoice (official, created after comparison approval)
+model InvoiceFinal {
+  id                  String             @id @default(uuid())
+  tenantId            String             @map("tenant_id")
+  comparisonId        String             @unique @map("comparison_id")
+  invoiceNumber       String             @map("invoice_number")
+  totalAmount         Float              @map("total_amount")
+  qrPayload           String             @map("qr_payload") // Server-signed official QR
+  qrSignature         String             @map("qr_signature")
+  invoiceData         String             @db.Text // JSON with full invoice details
+  createdAt           DateTime           @default(now()) @map("created_at")
+  
+  tenant              Tenant             @relation(fields: [tenantId], references: [id])
+  comparison          InvoiceComparison  @relation(fields: [comparisonId], references: [id])
+
+  @@unique([tenantId, invoiceNumber])
+  @@map("invoice_finals")
+}
+
+// Stock Count Session (physical inventory count)
+model StockCountSession {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  deviceId        String?   @map("device_id")
+  sessionNumber   String    @map("session_number")
+  status          String    @default("draft") // draft, in_progress, completed, reconciled
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  device          Device?   @relation(fields: [deviceId], references: [id])
+  
+  lines           StockCountLine[]
+  adjustments     StockAdjustment[]
+
+  @@unique([tenantId, sessionNumber])
+  @@map("stock_count_sessions")
+}
+
+// Stock Count Line (scanned items during count)
+model StockCountLine {
+  id              String             @id @default(uuid())
+  sessionId       String             @map("session_id")
+  productId       String             @map("product_id")
+  countedQuantity Float              @map("counted_quantity")
+  scannedAt       DateTime           @default(now()) @map("scanned_at")
+  
+  session         StockCountSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product         Product            @relation(fields: [productId], references: [id])
+
+  @@map("stock_count_lines")
+}
+
+// Stock Adjustment (result of reconciliation)
+model StockAdjustment {
+  id                String             @id @default(uuid())
+  sessionId         String             @map("session_id")
+  productId         String             @map("product_id")
+  expectedQuantity  Float              @map("expected_quantity")
+  countedQuantity   Float              @map("counted_quantity")
+  adjustmentQuantity Float             @map("adjustment_quantity")
+  reason            String?
+  createdAt         DateTime           @default(now()) @map("created_at")
+  
+  session           StockCountSession  @relation(fields: [sessionId], references: [id])
+  product           Product            @relation(fields: [productId], references: [id])
+
+  @@map("stock_adjustments")
+}
+
+// Audit Log (track all operations for compliance)
+model AuditLog {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  userId          String?  @map("user_id")
+  deviceId        String?  @map("device_id")
+  action          String   // e.g., "CREATE_DRAFT", "SYNC_UPLOAD", "COMPARE_INVOICES"
+  entityType      String   @map("entity_type") // e.g., "InvoiceDraft", "StockCountSession"
+  entityId        String   @map("entity_id")
+  changes         String?  @db.Text // JSON with details
+  ipAddress       String?  @map("ip_address")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// Sync Operation (track sync operations for idempotency)
+model SyncOperation {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  deviceId        String   @map("device_id")
+  opId            String   @map("op_id") // Client-provided operation ID for idempotency
+  opType          String   @map("op_type") // e.g., "CREATE_DRAFT", "UPDATE_STOCK_COUNT"
+  tempId          String?  @map("temp_id") // Client's temporary ID
+  serverId        String?  @map("server_id") // Server's generated ID
+  status          String   @default("pending") // pending, success, failed
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+  processedAt     DateTime? @map("processed_at")
+
+  @@unique([tenantId, deviceId, opId])
+  @@map("sync_operations")
+}
