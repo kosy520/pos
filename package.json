@@ -1,0 +1,43 @@
+{
+  "name": "pos-erp-system",
+  "version": "1.0.0",
+  "description": "Comprehensive ERP/POS System with Sales, Inventory, CRM, Invoicing, and Offline Support",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "client": "cd client && npm start",
+    "install-client": "cd client && npm install",
+    "build": "cd client && npm run build",
+    "test": "jest --coverage",
+    "lint": "eslint server/**/*.js"
+  },
+  "keywords": [
+    "pos",
+    "erp",
+    "inventory",
+    "crm",
+    "invoicing",
+    "qr-code",
+    "offline"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "qrcode": "^1.5.4",
+    "sqlite3": "^5.1.7",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.38.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10"
+  }
+}
